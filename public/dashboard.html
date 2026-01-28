@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GoPay Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.263.1/lucide.min.js"></script> -->
+</head>
+
+<body class="bg-gray-50 text-gray-800 font-sans">
+
+  <nav class="bg-white border-b border-gray-200 px-8 py-4 flex justify-between items-center">
+    <div class="flex items-center gap-2">
+      <div class="bg-blue-600 text-white p-2 rounded-lg font-bold">GP</div>
+      <span class="font-bold text-xl tracking-tight">GoPay</span>
+    </div>
+    <div class="text-sm text-gray-500">Merchant: <span id="merchantIdDisplay" class="font-mono">...</span></div>
+  </nav>
+
+  <div class="max-w-5xl mx-auto mt-10 px-6">
+
+    <div class="flex justify-between items-end mb-8">
+      <div>
+        <h1 class="text-3xl font-bold text-gray-900">Overview</h1>
+        <p class="text-gray-500 mt-1">Here's what's happening with your money.</p>
+      </div>
+      <div class="flex gap-2">
+        <input id="apiKey" type="password" class="border p-2 rounded text-sm w-64">
+        <button onclick="loadDashboard()"
+          class="bg-gray-900 text-white px-4 py-2 rounded hover:bg-gray-800 transition">Refresh</button>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-3 gap-6 mb-10">
+      <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+        <div class="text-gray-500 text-sm font-medium uppercase tracking-wider mb-1">Total Balance</div>
+        <div class="text-4xl font-extrabold text-gray-900" id="balanceDisplay">...</div>
+        <div class="text-green-600 text-sm mt-2 flex items-center gap-1">
+          <!-- <i data-lucide="trending-up" class="w-4 h-4"></i> -->
+          Available to Payout
+        </div>
+      </div>
+
+      <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+        <div class="text-gray-500 text-sm font-medium uppercase tracking-wider mb-1">Last Payment</div>
+        <div class="text-2xl font-bold text-gray-900" id="lastPaymentDisplay">...</div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+        <h3 class="font-bold text-gray-800">Recent Transactions</h3>
+        <span class="text-xs text-gray-400 uppercase font-semibold">Real-time</span>
+      </div>
+      <table class="w-full text-left border-collapse">
+        <thead>
+          <tr class="bg-gray-50 text-gray-500 text-xs uppercase">
+            <th class="px-6 py-3 font-medium">Status</th>
+            <th class="px-6 py-3 font-medium">Amount</th>
+            <th class="px-6 py-3 font-medium">Description</th>
+            <th class="px-6 py-3 font-medium">Date</th>
+          </tr>
+        </thead>
+        <tbody id="txTable" class="text-sm">
+          <tr>
+            <td colspan="4" class="text-center py-8 text-gray-400">Enter API Key to load data</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    // lucide.createIcons();
+
+    // 1. Hardcoded Merchant ID (Use the one from your database)
+    const MERCHANT_ID = "";
+    document.getElementById('merchantIdDisplay').innerText = MERCHANT_ID;
+
+    async function loadDashboard() {
+      const apiKey = document.getElementById('apiKey').value;
+      if (!apiKey) return alert("Please enter your API Key");
+
+      try {
+        // Fetch Transactions
+        const res = await fetch(`http://localhost:3000/v1/accounts/${MERCHANT_ID}/transactions`, {
+          headers: { 'Authorization': 'Bearer ' + apiKey }
+        });
+
+        if (!res.ok) throw new Error("Failed to fetch");
+
+        const data = await res.json();
+        renderTable(data.transactions);
+
+        // Calculate pseudo-balance (Sum of credits minus debits from history)
+        // In a real app, you'd fetch the exact balance from the /accounts endpoint
+        let balance = 0;
+        let lastPay = 0;
+
+        data.transactions.forEach(tx => {
+          if (tx.direction === "CREDIT") {
+            balance += tx.amount;
+            lastPay = tx.amount;
+          } else {
+            balance -= tx.amount;
+          }
+        });
+
+        document.getElementById('balanceDisplay').innerText = (balance / 100).toLocaleString('en-US', { style: 'currency', currency: 'TZS' });
+        document.getElementById('lastPaymentDisplay').innerText = "+" + (lastPay / 100).toLocaleString('en-US', { style: 'currency', currency: 'TZS' });
+
+      } catch (err) {
+        console.error(err);
+        alert("Error loading dashboard. Check API Key.");
+      }
+    }
+
+    function renderTable(txs) {
+      const tbody = document.getElementById('txTable');
+      tbody.innerHTML = "";
+
+      txs.forEach(tx => {
+        const isCredit = tx.direction === "CREDIT";
+        const amountClass = isCredit ? "text-green-600 font-bold" : "text-gray-900";
+        const sign = isCredit ? "+" : "-";
+
+        const row = `
+                    <tr class="border-b border-gray-50 hover:bg-gray-50 transition">
+                        <td class="px-6 py-4">
+                            <span class="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full font-medium">Succeeded</span>
+                        </td>
+                        <td class="px-6 py-4 ${amountClass}">
+                            ${sign}${(tx.amount / 100).toFixed(2)} <span class="text-xs text-gray-400">${tx.currency}</span>
+                        </td>
+                        <td class="px-6 py-4 text-gray-600">${tx.description}</td>
+                        <td class="px-6 py-4 text-gray-400 text-xs">${new Date(tx.date).toLocaleString()}</td>
+                    </tr>
+                `;
+        tbody.innerHTML += row;
+      });
+    }
+  </script>
+</body>
+
+</html>

@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -97,4 +98,53 @@ func (r *LedgerRepository) Transfer(ctx context.Context, fromID, toID uuid.UUID,
 	}
 
 	return tx.Commit(ctx)
+}
+
+// GetHistory fetches the last 10 transactions for an account
+func (r *LedgerRepository) GetHistory(ctx context.Context, accountID uuid.UUID) ([]map[string]interface{}, error) {
+	// We join 'entries' with 'transactions' to get the full details
+	query := `
+		SELECT 
+			t.id, 
+			t.amount, 
+			t.currency, 
+			t.description, 
+			t.status, 
+			t.created_at,
+			e.direction -- Was this a CREDIT (In) or DEBIT (Out)?
+		FROM entries e
+		JOIN transactions t ON e.transaction_id = t.id
+		WHERE e.account_id = $1
+		ORDER BY t.created_at DESC
+		LIMIT 10
+	`
+
+	rows, err := r.db.Query(ctx, query, accountID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var history []map[string]interface{}
+
+	for rows.Next() {
+		var id uuid.UUID
+		var amount int64
+		var currency, description, status, direction string
+		var createdAt time.Time
+
+		rows.Scan(&id, &amount, &currency, &description, &status, &createdAt, &direction)
+
+		history = append(history, map[string]interface{}{
+			"id":          id,
+			"amount":      amount,
+			"currency":    currency,
+			"description": description,
+			"status":      status,
+			"direction":   direction, // "CREDIT" or "DEBIT"
+			"date":        createdAt,
+		})
+	}
+
+	return history, nil
 }

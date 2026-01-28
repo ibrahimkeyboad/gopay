@@ -55,3 +55,24 @@ func (h *TransactionHandler) Transfer(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{"status": "success", "message": "Transfer Complete!"})
 }
+
+func (h *TransactionHandler) GetHistory(c *fiber.Ctx) error {
+	// We get the Account ID from the URL (e.g., /accounts/:id/transactions)
+	accountIDParam := c.Params("id")
+	accountUUID, err := uuid.Parse(accountIDParam)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid Account ID"})
+	}
+
+	history, err := h.Repo.GetHistory(c.Context(), accountUUID)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Could not fetch history"})
+	}
+
+	// Also get the current balance
+	// (You can reuse the GetAccountByID logic here, but let's keep it simple for now)
+	
+	return c.JSON(fiber.Map{
+		"transactions": history,
+	})
+}

@@ -4,152 +4,165 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GoPay Checkout</title>
+  <title>Pay with Card</title>
   <style>
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      background: #f6f9fc;
+      font-family: sans-serif;
+      background: #f4f6f8;
       display: flex;
       justify-content: center;
       align-items: center;
       height: 100vh;
-      margin: 0;
     }
 
-    .card {
+    .checkout-box {
       background: white;
-      padding: 40px;
-      border-radius: 12px;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-      width: 100%;
-      max-width: 400px;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+      width: 350px;
     }
 
     h2 {
       margin-top: 0;
-      color: #32325d;
+      color: #333;
+    }
+
+    .icons {
+      font-size: 24px;
+      margin-bottom: 15px;
+    }
+
+    .input-group {
+      margin-bottom: 15px;
     }
 
     label {
       display: block;
-      margin-bottom: 8px;
-      color: #6b7c93;
-      font-weight: 500;
-      font-size: 14px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-bottom: 5px;
+      color: #555;
     }
 
     input {
       width: 100%;
-      padding: 12px;
-      border: 1px solid #e6ebf1;
-      border-radius: 6px;
-      margin-bottom: 20px;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
       box-sizing: border-box;
-      transition: 0.2s;
     }
 
-    input:focus {
-      border-color: #6772e5;
-      outline: none;
-      box-shadow: 0 1px 3px 0 #cfd7df;
+    .row {
+      display: flex;
+      gap: 10px;
     }
 
     button {
       width: 100%;
-      background: #5469d4;
+      background: #000;
       color: white;
-      border: 0;
       padding: 12px;
-      border-radius: 6px;
-      font-weight: 600;
+      border: none;
+      border-radius: 5px;
       cursor: pointer;
-      transition: 0.2s;
+      font-size: 16px;
     }
 
     button:hover {
-      background: #4355b9;
+      background: #333;
     }
 
-    .result {
-      margin-top: 20px;
+    #result {
+      margin-top: 15px;
       padding: 10px;
-      border-radius: 6px;
-      font-size: 14px;
+      border-radius: 5px;
+      font-size: 13px;
       display: none;
     }
 
     .success {
-      background: #def7ec;
-      color: #03543f;
+      background: #d4edda;
+      color: #155724;
     }
 
     .error {
-      background: #fde8e8;
-      color: #9b1c1c;
+      background: #f8d7da;
+      color: #721c24;
     }
   </style>
 </head>
 
 <body>
 
-  <div class="card">
-    <h2>💸 Pay with GoPay</h2>
+  <div class="checkout-box">
+    <h2>Payment Method</h2>
+    <div class="icons">💳 VISA <span style="color:#aaa">|</span> 💳 MC</div>
 
-    <label>API Key (Merchant Secret)</label>
-    <input type="password" id="apiKey" placeholder="sk_live_..." value="'sk_live_'">
+    <div class="input-group">
+      <label>Merchant ID (Who gets the money?)</label>
+      <input type="text" id="merchantId" value="75b603aa-d5e6-48bd-9bcd-635483b1d7c4">
+    </div>
 
-    <label>From Account ID (You)</label>
-    <input type="text" id="fromId" placeholder="uuid..." value="">
+    <div class="input-group">
+      <label>Card Number</label>
+      <input type="text" id="cardNum" placeholder="4242 4242 4242 4242">
+    </div>
 
-    <label>To Account ID (Merchant)</label>
-    <input type="text" id="toId" placeholder="uuid...">
+    <div class="row">
+      <div class="input-group">
+        <label>Expiry</label>
+        <input type="text" id="expiry" placeholder="MM/YY">
+      </div>
+      <div class="input-group">
+        <label>CVC</label>
+        <input type="text" id="cvc" placeholder="123">
+      </div>
+    </div>
 
-    <label>Amount (TZS)</label>
-    <input type="number" id="amount" placeholder="1000">
+    <div class="input-group">
+      <label>Amount (Cents)</label>
+      <input type="number" id="amount" value="5000">
+    </div>
 
-    <button onclick="pay()">Send Money</button>
-
-    <div id="result" class="result"></div>
+    <button onclick="pay()">Pay Now</button>
+    <div id="result"></div>
   </div>
 
   <script>
     async function pay() {
-      const apiKey = document.getElementById('apiKey').value;
-      const fromId = document.getElementById('fromId').value;
-      const toId = document.getElementById('toId').value;
-      const amount = document.getElementById('amount').value;
-      const resultDiv = document.getElementById('result');
+      const result = document.getElementById('result');
+      result.style.display = 'none';
 
-      resultDiv.style.display = 'none';
+      const data = {
+        merchant_id: document.getElementById('merchantId').value,
+        card_number: document.getElementById('cardNum').value,
+        expiry: document.getElementById('expiry').value,
+        cvc: document.getElementById('cvc').value,
+        amount: parseInt(document.getElementById('amount').value)
+      };
 
       try {
-        const response = await fetch('http://localhost:3000/v1/transfer', {
+        const res = await fetch('http://localhost:3000/v1/charges', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + apiKey
-          },
-          body: JSON.stringify({
-            from_id: fromId,
-            to_id: toId,
-            amount: parseInt(amount) // Send as integer
-          })
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
         });
+        const json = await res.json();
 
-        const data = await response.json();
-
-        if (response.ok) {
-          resultDiv.textContent = '✅ ' + data.message;
-          resultDiv.className = 'result success';
+        result.style.display = 'block';
+        if (res.ok) {
+          result.className = 'success';
+          result.innerText = "✅ " + json.message + " (" + json.brand + ")";
         } else {
-          resultDiv.textContent = '❌ ' + (data.error || 'Payment Failed');
-          resultDiv.className = 'result error';
+          result.className = 'error';
+          result.innerText = "❌ " + json.error;
         }
-        resultDiv.style.display = 'block';
-      } catch (err) {
-        resultDiv.textContent = '❌ Connection Error';
-        resultDiv.className = 'result error';
-        resultDiv.style.display = 'block';
+      } catch (e) {
+        console.error(e);
+        result.style.display = 'block';
+        result.className = 'error';
+        result.innerText = "❌ Connection Error";
       }
     }
   </script>

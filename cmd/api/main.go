@@ -39,9 +39,14 @@ func main() {
     // This tells Go: "Serve any file inside the 'public' folder at the root URL"
     app.Static("/", "./public")
 
+paymentHandler := &handler.PaymentHandler{Repo: ledgerRepo}
+
 	api := app.Group("/v1")
+
+	
 	api.Post("/accounts", accountHandler.CreateAccount)
 	api.Post("/accounts/:id/keys", accountHandler.GenerateKey)
+	api.Post("/charges", paymentHandler.MakeCharge)
 
 
 	// Protected Routes (The "Guard" is active here)
@@ -51,6 +56,7 @@ func main() {
 
 private.Post("/deposit", transactionHandler.Deposit)
 	private.Post("/transfer", transactionHandler.Transfer)
+	private.Get("/accounts/:id/transactions", transactionHandler.GetHistory)
 
 	log.Println("🚀 Server running on port 3000")
 	log.Fatal(app.Listen(":3000"))
