@@ -14,7 +14,7 @@
   <nav class="bg-white border-b border-gray-200 px-8 py-4 flex justify-between items-center">
     <div class="flex items-center gap-2">
       <div class="bg-blue-600 text-white p-2 rounded-lg font-bold">GP</div>
-      <span class="font-bold text-xl tracking-tight">GoPay</span>
+      <a href="/" class="font-bold text-xl tracking-tight">GoPay</a>
     </div>
     <div class="text-sm text-gray-500">Merchant: <span id="merchantIdDisplay" class="font-mono">...</span></div>
   </nav>
@@ -27,7 +27,7 @@
         <p class="text-gray-500 mt-1">Here's what's happening with your money.</p>
       </div>
       <div class="flex gap-2">
-        <input id="apiKey" type="password" class="border p-2 rounded text-sm w-64">
+        <input id="apiKey" value="" type="password" class="border p-2 rounded text-sm w-64">
         <button onclick="loadDashboard()"
           class="bg-gray-900 text-white px-4 py-2 rounded hover:bg-gray-800 transition">Refresh</button>
       </div>

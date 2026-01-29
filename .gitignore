@@ -1,4 +1,10 @@
-# .gitignore
+# Secrets
 .env
-bin/
-vendor/
+
+# Go Binaries
+/bin/
+main
+gopay
+
+# OS Specific
+.DS_Store

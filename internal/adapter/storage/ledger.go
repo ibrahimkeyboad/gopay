@@ -10,22 +10,23 @@ import (
 )
 
 type LedgerRepository struct {
-	db *pgxpool.Pool
+	// CHANGE IS HERE: We changed 'db' to 'Db' (Capital D makes it public)
+	Db *pgxpool.Pool 
 }
 
 func NewLedgerRepository(db *pgxpool.Pool) *LedgerRepository {
-	return &LedgerRepository{db: db}
+	return &LedgerRepository{Db: db}
 }
 
-// Deposit adds money to an account (Simulating a top-up from a Bank/Stripe)
+// Deposit adds money to an account
 func (r *LedgerRepository) Deposit(ctx context.Context, accountID uuid.UUID, amount int64, description string) error {
-	tx, err := r.db.Begin(ctx) // Start Transaction
+	// UPDATE HERE: Use r.Db instead of r.db
+	tx, err := r.Db.Begin(ctx)
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx) // Safety: Undo everything if we don't commit
+	defer tx.Rollback(ctx)
 
-	// 1. Create Transaction Record
 	var transactionID uuid.UUID
 	err = tx.QueryRow(ctx, `
 		INSERT INTO transactions (amount, currency, description, status)
@@ -34,13 +35,11 @@ func (r *LedgerRepository) Deposit(ctx context.Context, accountID uuid.UUID, amo
 		return err
 	}
 
-	// 2. Add Money to Account
 	_, err = tx.Exec(ctx, `UPDATE accounts SET balance = balance + $1 WHERE id = $2`, amount, accountID)
 	if err != nil {
 		return err
 	}
 
-	// 3. Create Ledger Entry (Credit)
 	_, err = tx.Exec(ctx, `
 		INSERT INTO entries (transaction_id, account_id, direction, amount)
 		VALUES ($1, $2, 'CREDIT', $3)`, transactionID, accountID, amount)
@@ -48,18 +47,18 @@ func (r *LedgerRepository) Deposit(ctx context.Context, accountID uuid.UUID, amo
 		return err
 	}
 
-	return tx.Commit(ctx) // Save changes
+	return tx.Commit(ctx)
 }
 
-// Transfer moves money safely between two accounts
+// Transfer moves money safely
 func (r *LedgerRepository) Transfer(ctx context.Context, fromID, toID uuid.UUID, amount int64) error {
-	tx, err := r.db.Begin(ctx)
+	// UPDATE HERE: Use r.Db instead of r.db
+	tx, err := r.Db.Begin(ctx)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback(ctx)
 
-	// 1. Lock Sender Account & Check Balance
 	var balance int64
 	err = tx.QueryRow(ctx, `SELECT balance FROM accounts WHERE id = $1 FOR UPDATE`, fromID).Scan(&balance)
 	if err != nil {
@@ -70,7 +69,6 @@ func (r *LedgerRepository) Transfer(ctx context.Context, fromID, toID uuid.UUID,
 		return fmt.Errorf("insufficient funds: you have %d but tried to send %d", balance, amount)
 	}
 
-	// 2. Create Transaction Record
 	var transactionID uuid.UUID
 	err = tx.QueryRow(ctx, `
 		INSERT INTO transactions (amount, currency, description, status)
@@ -79,17 +77,14 @@ func (r *LedgerRepository) Transfer(ctx context.Context, fromID, toID uuid.UUID,
 		return err
 	}
 
-	// 3. Deduct from Sender
 	if _, err := tx.Exec(ctx, `UPDATE accounts SET balance = balance - $1 WHERE id = $2`, amount, fromID); err != nil {
 		return err
 	}
 	
-	// 4. Add to Receiver
 	if _, err := tx.Exec(ctx, `UPDATE accounts SET balance = balance + $1 WHERE id = $2`, amount, toID); err != nil {
 		return err
 	}
 
-	// 5. Create Entries (Debit Sender, Credit Receiver)
 	if _, err := tx.Exec(ctx, `INSERT INTO entries (transaction_id, account_id, direction, amount) VALUES ($1, $2, 'DEBIT', $3)`, transactionID, fromID, amount); err != nil {
 		return err
 	}
@@ -100,18 +95,11 @@ func (r *LedgerRepository) Transfer(ctx context.Context, fromID, toID uuid.UUID,
 	return tx.Commit(ctx)
 }
 
-// GetHistory fetches the last 10 transactions for an account
+// GetHistory fetches the last 10 transactions
 func (r *LedgerRepository) GetHistory(ctx context.Context, accountID uuid.UUID) ([]map[string]interface{}, error) {
-	// We join 'entries' with 'transactions' to get the full details
 	query := `
 		SELECT 
-			t.id, 
-			t.amount, 
-			t.currency, 
-			t.description, 
-			t.status, 
-			t.created_at,
-			e.direction -- Was this a CREDIT (In) or DEBIT (Out)?
+			t.id, t.amount, t.currency, t.description, t.status, t.created_at, e.direction
 		FROM entries e
 		JOIN transactions t ON e.transaction_id = t.id
 		WHERE e.account_id = $1
@@ -119,7 +107,8 @@ func (r *LedgerRepository) GetHistory(ctx context.Context, accountID uuid.UUID) 
 		LIMIT 10
 	`
 
-	rows, err := r.db.Query(ctx, query, accountID)
+	// UPDATE HERE: Use r.Db instead of r.db
+	rows, err := r.Db.Query(ctx, query, accountID)
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +130,7 @@ func (r *LedgerRepository) GetHistory(ctx context.Context, accountID uuid.UUID) 
 			"currency":    currency,
 			"description": description,
 			"status":      status,
-			"direction":   direction, // "CREDIT" or "DEBIT"
+			"direction":   direction,
 			"date":        createdAt,
 		})
 	}
